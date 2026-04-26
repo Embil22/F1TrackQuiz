@@ -1,0 +1,213 @@
+<?php
+// frontend/quiz.php
+require_once '../backend/config.php';
+redirectIfNotLoggedIn();
+
+// Get all tracks for the quiz (random sorrendben)
+$stmt = $pdo->query("SELECT id, name, country, image_url FROM tracks ORDER BY RAND()");
+$tracks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Minden pályához gyűjtsünk 3 random másik pályát (helytelen válaszok)
+$all_track_names = [];
+$stmt = $pdo->query("SELECT id, name FROM tracks");
+$all_tracks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+foreach ($all_tracks as $track) {
+    $all_track_names[$track['id']] = $track['name'];
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Quiz - Take the Quiz</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .question-card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .quiz-layout {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .track-image-side {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .track-image-side img {
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        
+        .options-side {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .option-card {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .option-card:hover {
+            background: #667eea;
+            border-color: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .option-card.selected {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        
+        .option-card.correct-highlight {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        
+        .option-card.wrong-highlight {
+            background: #dc3545;
+            border-color: #dc3545;
+            color: white;
+        }
+        
+        .feedback-message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .feedback-correct {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .feedback-wrong {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .navigation-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        @media (max-width: 768px) {
+            .quiz-layout {
+                flex-direction: column;
+            }
+            
+            .options-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="quiz-header">
+            <h1>🏎️ F1 Track Quiz 🏁</h1>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="quiz-stats">
+                <span id="questionCounter">Question 1/24</span>
+                <span id="scoreCounter">Score: 0</span>
+            </div>
+        </div>
+        
+        <form id="quizForm" method="POST" action="../backend/submit_quiz_multiple.php">
+            <div id="questionsContainer">
+                <?php foreach ($tracks as $index => $track): 
+                    // Generáljunk 3 random másik pályát (helytelen válaszok)
+                    $other_tracks = array_diff(array_keys($all_track_names), [$track['id']]);
+                    shuffle($other_tracks);
+                    $wrong_options = array_slice($other_tracks, 0, 3);
+                    
+                    $options = [];
+                    $options[] = ['id' => $track['id'], 'name' => $track['name']]; // helyes
+                    
+                    foreach ($wrong_options as $wrong_id) {
+                        $options[] = ['id' => $wrong_id, 'name' => $all_track_names[$wrong_id]];
+                    }
+                    
+                    // Megkeverjük a válaszlehetőségeket
+                    shuffle($options);
+                ?>
+                    <div class="question-card" data-question="<?php echo $index; ?>" data-track-id="<?php echo $track['id']; ?>" style="display: <?php echo $index === 0 ? 'block' : 'none'; ?>">
+                        <div class="question-number">Question <?php echo $index + 1; ?> / 24</div>
+                        
+                        <div class="quiz-layout">
+                            <div class="track-image-side">
+                                <img src="<?php echo htmlspecialchars($track['image_url']); ?>" alt="Track <?php echo $index + 1; ?>">
+                            </div>
+                            
+                            <div class="options-side">
+                                <h3>Which circuit is this?</h3>
+                                <div class="options-grid" data-question-idx="<?php echo $index; ?>">
+                                    <?php foreach ($options as $opt): ?>
+                                        <div class="option-card" data-track-id="<?php echo $opt['id']; ?>" data-track-name="<?php echo htmlspecialchars($opt['name']); ?>">
+                                            <?php echo htmlspecialchars($opt['name']); ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="feedback-message" id="feedback_<?php echo $index; ?>"></div>
+                            </div>
+                        </div>
+                        
+                        <input type="hidden" name="answers[<?php echo $track['id']; ?>]" id="answer_<?php echo $track['id']; ?>" value="">
+                        <input type="hidden" name="track_ids[]" value="<?php echo $track['id']; ?>">
+                        
+                        <div class="navigation-buttons">
+                            <?php if ($index > 0): ?>
+                                <button type="button" class="btn-nav prev-btn" data-prev="<?php echo $index - 1; ?>">← Previous</button>
+                            <?php else: ?>
+                                <div></div>
+                            <?php endif; ?>
+                            
+                            <?php if ($index < count($tracks) - 1): ?>
+                                <button type="button" class="btn-nav next-btn" data-next="<?php echo $index + 1; ?>">Next →</button>
+                            <?php else: ?>
+                                <button type="submit" class="btn-submit">Submit Quiz ✅</button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </form>
+    </div>
+    
+    <script src="script_multiple.js"></script>
+</body>
+</html>
