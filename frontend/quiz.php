@@ -72,26 +72,25 @@ foreach ($all_tracks as $track) {
             transition: all 0.3s ease;
         }
         
-        .option-card:hover {
+        .option-card:hover:not(.disabled) {
             background: #667eea;
             border-color: #667eea;
             color: white;
             transform: translateY(-2px);
         }
         
-        .option-card.selected {
+        .option-card.disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        
+        .option-card.correct-answer {
             background: #28a745;
             border-color: #28a745;
             color: white;
         }
         
-        .option-card.correct-highlight {
-            background: #28a745;
-            border-color: #28a745;
-            color: white;
-        }
-        
-        .option-card.wrong-highlight {
+        .option-card.wrong-answer {
             background: #dc3545;
             border-color: #dc3545;
             color: white;
@@ -115,9 +114,16 @@ foreach ($all_tracks as $track) {
             color: #721c24;
         }
         
+        .next-indicator {
+            text-align: center;
+            margin-top: 20px;
+            color: #667eea;
+            font-size: 14px;
+        }
+        
         .navigation-buttons {
             display: flex;
-            justify-content: space-between;
+            justify-content: flex-end;
             margin-top: 30px;
             padding-top: 20px;
             border-top: 1px solid #e0e0e0;
@@ -131,6 +137,18 @@ foreach ($all_tracks as $track) {
             .options-grid {
                 grid-template-columns: 1fr;
             }
+        }
+        
+        .quiz-complete {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 10px;
+        }
+        
+        .quiz-complete h2 {
+            color: #28a745;
+            margin-bottom: 20px;
         }
     </style>
 </head>
@@ -165,7 +183,7 @@ foreach ($all_tracks as $track) {
                     // Megkeverjük a válaszlehetőségeket
                     shuffle($options);
                 ?>
-                    <div class="question-card" data-question="<?php echo $index; ?>" data-track-id="<?php echo $track['id']; ?>" style="display: <?php echo $index === 0 ? 'block' : 'none'; ?>">
+                    <div class="question-card" data-question="<?php echo $index; ?>" data-track-id="<?php echo $track['id']; ?>" data-correct-name="<?php echo htmlspecialchars($track['name']); ?>" style="display: <?php echo $index === 0 ? 'block' : 'none'; ?>">
                         <div class="question-number">Question <?php echo $index + 1; ?> / 24</div>
                         
                         <div class="quiz-layout">
@@ -183,6 +201,9 @@ foreach ($all_tracks as $track) {
                                     <?php endforeach; ?>
                                 </div>
                                 <div class="feedback-message" id="feedback_<?php echo $index; ?>"></div>
+                                <div class="next-indicator" id="next_indicator_<?php echo $index; ?>" style="display: none;">
+                                    ⏩ Moving to next question...
+                                </div>
                             </div>
                         </div>
                         
@@ -190,17 +211,7 @@ foreach ($all_tracks as $track) {
                         <input type="hidden" name="track_ids[]" value="<?php echo $track['id']; ?>">
                         
                         <div class="navigation-buttons">
-                            <?php if ($index > 0): ?>
-                                <button type="button" class="btn-nav prev-btn" data-prev="<?php echo $index - 1; ?>">← Previous</button>
-                            <?php else: ?>
-                                <div></div>
-                            <?php endif; ?>
-                            
-                            <?php if ($index < count($tracks) - 1): ?>
-                                <button type="button" class="btn-nav next-btn" data-next="<?php echo $index + 1; ?>">Next →</button>
-                            <?php else: ?>
-                                <button type="submit" class="btn-submit">Submit Quiz ✅</button>
-                            <?php endif; ?>
+                            <button type="submit" class="btn-submit" id="submitBtn" style="display: none;">Submit Quiz ✅</button>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -208,6 +219,198 @@ foreach ($all_tracks as $track) {
         </form>
     </div>
     
-    <script src="script_multiple.js"></script>
+    <script>
+        let currentQuestion = 0;
+        let totalQuestions = 24;
+        let userAnswers = {};
+        let autoTransitionTimeout = null;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            updateProgress();
+            attachOptionClickHandlers();
+        });
+        
+        function attachOptionClickHandlers() {
+            document.querySelectorAll('.option-card').forEach(option => {
+                option.removeEventListener('click', optionClickHandler);
+                option.addEventListener('click', optionClickHandler);
+            });
+        }
+        
+        function optionClickHandler(e) {
+            const option = e.currentTarget;
+            const questionCard = option.closest('.question-card');
+            
+            // Ellenőrizzük, hogy a kérdés már meg lett-e válaszolva
+            const questionIndex = parseInt(questionCard.dataset.question);
+            if (userAnswers[questionIndex] && userAnswers[questionIndex].answered) {
+                return; // Ha már válaszolt, ne engedjük módosítani
+            }
+            
+            const correctTrackId = questionCard.dataset.trackId;
+            const selectedTrackId = option.dataset.trackId;
+            const selectedTrackName = option.dataset.trackName;
+            const correctTrackName = questionCard.dataset.correctName;
+            const questionId = questionCard.querySelector('input[type="hidden"]').id.replace('answer_', '');
+            
+            // Letiltjuk az összes opciót ebben a kérdésben
+            const optionsGrid = option.closest('.options-grid');
+            const allOptions = optionsGrid.querySelectorAll('.option-card');
+            
+            // Kiemeljük a helyes és helytelen választ
+            allOptions.forEach(opt => {
+                opt.style.pointerEvents = 'none';
+                opt.classList.add('disabled');
+                
+                if (opt.dataset.trackId === correctTrackId) {
+                    opt.classList.add('correct-answer');
+                }
+                if (opt === option && selectedTrackId !== correctTrackId) {
+                    opt.classList.add('wrong-answer');
+                }
+            });
+            
+            // Kiértékelés
+            const isCorrect = (selectedTrackId === correctTrackId);
+            
+            // Mentés
+            userAnswers[questionIndex] = {
+                track_id: questionId,
+                selected_id: selectedTrackId,
+                selected_name: selectedTrackName,
+                is_correct: isCorrect,
+                answered: true
+            };
+            
+            // Hidden input frissítése
+            const hiddenInput = document.querySelector(`#answer_${questionId}`);
+            if (hiddenInput) {
+                hiddenInput.value = selectedTrackId;
+            }
+            
+            // Feedback megjelenítése
+            const feedbackDiv = document.getElementById(`feedback_${questionIndex}`);
+            if (feedbackDiv) {
+                if (isCorrect) {
+                    feedbackDiv.innerHTML = '✅ Correct! Well done!';
+                    feedbackDiv.className = 'feedback-message feedback-correct';
+                } else {
+                    feedbackDiv.innerHTML = `❌ Wrong! The correct answer is: ${correctTrackName}`;
+                    feedbackDiv.className = 'feedback-message feedback-wrong';
+                }
+            }
+            
+            // Score frissítése
+            updateScore();
+            
+            // Továbblépés jelzése
+            const nextIndicator = document.getElementById(`next_indicator_${questionIndex}`);
+            if (nextIndicator) {
+                nextIndicator.style.display = 'block';
+            }
+            
+            // Automatikus továbblépés a következő kérdésre
+            if (autoTransitionTimeout) {
+                clearTimeout(autoTransitionTimeout);
+            }
+            
+            autoTransitionTimeout = setTimeout(() => {
+                if (currentQuestion + 1 < totalQuestions) {
+                    showQuestion(currentQuestion + 1);
+                } else {
+                    // Utolsó kérdés volt, beküldjük a kvízt
+                    showSubmitButton();
+                }
+            }, 1500);
+        }
+        
+        function updateScore() {
+            let correctCount = 0;
+            let answeredCount = 0;
+            
+            for (const [key, answer] of Object.entries(userAnswers)) {
+                if (answer.answered) {
+                    answeredCount++;
+                    if (answer.is_correct) correctCount++;
+                }
+            }
+            
+            const scoreCounter = document.getElementById('scoreCounter');
+            if (scoreCounter) {
+                scoreCounter.textContent = `Score: ${correctCount}/${answeredCount}`;
+            }
+        }
+        
+        function showQuestion(questionIndex) {
+            // Clear any pending timeout
+            if (autoTransitionTimeout) {
+                clearTimeout(autoTransitionTimeout);
+            }
+            
+            // Hide all questions
+            document.querySelectorAll('.question-card').forEach(card => {
+                card.style.display = 'none';
+            });
+            
+            // Show selected question
+            const targetQuestion = document.querySelector(`.question-card[data-question="${questionIndex}"]`);
+            if (targetQuestion) {
+                targetQuestion.style.display = 'block';
+                currentQuestion = questionIndex;
+                updateProgress();
+                
+                // Ha a kérdés már meg lett válaszolva, ne csináljunk semmit
+                // (már úgyis látszik a feedback és a letiltott opciók)
+            }
+        }
+        
+        function showSubmitButton() {
+            const submitBtn = document.getElementById('submitBtn');
+            if (submitBtn) {
+                submitBtn.style.display = 'block';
+            }
+            
+            // Opcionális: üzenet, hogy kész a kvíz
+            const container = document.querySelector('#questionsContainer');
+            const lastQuestion = document.querySelector('.question-card:last-child');
+            if (lastQuestion) {
+                const completeDiv = document.createElement('div');
+                completeDiv.className = 'quiz-complete';
+                completeDiv.innerHTML = `
+                    <h2>🎉 You've completed all questions! 🎉</h2>
+                    <p>Click the submit button to see your results.</p>
+                `;
+                lastQuestion.appendChild(completeDiv);
+            }
+        }
+        
+        function updateProgress() {
+            const progress = ((currentQuestion + 1) / totalQuestions) * 100;
+            const progressBar = document.getElementById('progressBar');
+            if (progressBar) {
+                progressBar.style.width = `${progress}%`;
+            }
+            
+            const questionCounter = document.getElementById('questionCounter');
+            if (questionCounter) {
+                questionCounter.textContent = `Question ${currentQuestion + 1}/${totalQuestions}`;
+            }
+        }
+        
+        // Utolsó kérdés megválaszolása után automatikus beküldés (opcionális)
+        function autoSubmit() {
+            let allAnswered = true;
+            for (let i = 0; i < totalQuestions; i++) {
+                if (!userAnswers[i] || !userAnswers[i].answered) {
+                    allAnswered = false;
+                    break;
+                }
+            }
+            
+            if (allAnswered) {
+                document.getElementById('quizForm').submit();
+            }
+        }
+    </script>
 </body>
 </html>
