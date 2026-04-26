@@ -20,7 +20,7 @@ $stats = getUserStats($pdo, $_SESSION['user_id']);
             <h1>🏎️ F1 Track Quiz 🏁</h1>
             <div class="user-info">
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?>!</span>
-                <a href="logout.php" class="btn-logout">Logout</a>
+                <a href="../backend/logout.php" class="btn-logout">Logout</a>
             </div>
         </div>
         
