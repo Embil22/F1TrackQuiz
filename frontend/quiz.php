@@ -151,6 +151,11 @@ foreach ($all_tracks as $track) {
             color: #28a745;
             margin-bottom: 20px;
         }
+
+        .btn:hover {
+            transform: scale(1.1);
+            transition: 0.3s;
+        }
     </style>
 </head>
 
@@ -215,7 +220,7 @@ foreach ($all_tracks as $track) {
                 <?php endforeach; ?>
             </div>
         </form>
-        <a href="index.php" style="background-color: #2c50f0; color: white" class="btn, btn-animation">Vissza a főoldalra</a>
+        <a href="index.php" style="background-color: #2c50f0; color: white" class="btn">Vissza a főoldalra</a>
     </div>
 
     <script>
