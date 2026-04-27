@@ -162,8 +162,8 @@ foreach ($all_tracks as $track) {
                 <div class="progress-bar" id="progressBar"></div>
             </div>
             <div class="quiz-stats">
-                <span id="questionCounter">Question 1/24</span>
-                <span id="scoreCounter">Score: 0</span>
+                <span id="questionCounter">Kérdés 1/24</span>
+                <span id="scoreCounter">Pontszám: 0</span>
             </div>
         </div>
 
@@ -186,7 +186,7 @@ foreach ($all_tracks as $track) {
                     shuffle($options);
                 ?>
                     <div class="question-card" data-question="<?php echo $index; ?>" data-track-id="<?php echo $track['id']; ?>" data-correct-name="<?php echo htmlspecialchars($track['name']); ?>" style="display: <?php echo $index === 0 ? 'block' : 'none'; ?>">
-                        <div class="question-number">Question <?php echo $index + 1; ?> / 24</div>
+                        <div class="question-number">Kérdés <?php echo $index + 1; ?> / 24</div>
 
                         <div class="quiz-layout">
                             <div class="track-image-side">
@@ -194,7 +194,7 @@ foreach ($all_tracks as $track) {
                             </div>
 
                             <div class="options-side">
-                                <h3>Which circuit is this?</h3>
+                                <h3>Melyik pálya ez?</h3>
                                 <div class="options-grid" data-question-idx="<?php echo $index; ?>">
                                     <?php foreach ($options as $opt): ?>
                                         <div class="option-card" data-track-id="<?php echo $opt['id']; ?>" data-track-name="<?php echo htmlspecialchars($opt['name']); ?>">
@@ -204,7 +204,7 @@ foreach ($all_tracks as $track) {
                                 </div>
                                 <div class="feedback-message" id="feedback_<?php echo $index; ?>"></div>
                                 <div class="next-indicator" id="next_indicator_<?php echo $index; ?>" style="display: none;">
-                                    ⏩ Moving to next question...
+                                    ⏩ Következő kérdés...
                                 </div>
                             </div>
                         </div>
@@ -291,10 +291,10 @@ foreach ($all_tracks as $track) {
             const feedbackDiv = document.getElementById(`feedback_${questionIndex}`);
             if (feedbackDiv) {
                 if (isCorrect) {
-                    feedbackDiv.innerHTML = '✅ Correct! Well done!';
+                    feedbackDiv.innerHTML = '✅ Helyes! Szép volt!';
                     feedbackDiv.className = 'feedback-message feedback-correct';
                 } else {
-                    feedbackDiv.innerHTML = `❌ Wrong! The correct answer is: ${correctTrackName}`;
+                    feedbackDiv.innerHTML = `❌ Helytelen! A jó válasz: ${correctTrackName}`;
                     feedbackDiv.className = 'feedback-message feedback-wrong';
                 }
             }
@@ -336,7 +336,7 @@ foreach ($all_tracks as $track) {
 
             const scoreCounter = document.getElementById('scoreCounter');
             if (scoreCounter) {
-                scoreCounter.textContent = `Score: ${correctCount}/${answeredCount}`;
+                scoreCounter.textContent = `Pontszám: ${correctCount}/${answeredCount}`;
             }
         }
 
@@ -376,7 +376,7 @@ foreach ($all_tracks as $track) {
                     <h2>You've completed all questions!</h2>
                     <p>Click the submit button to see your results.</p>
                     <div class="navigation-buttons">
-                            <button type="submit" class="btn-submit" id="submitBtn";">Submit Quiz ✅</button>
+                            <button type="submit" class="btn-submit" id="submitBtn";">Beküldés ✅</button>
                     </div>
                 `;
                 lastQuestion.appendChild(completeDiv);
@@ -392,7 +392,7 @@ foreach ($all_tracks as $track) {
 
             const questionCounter = document.getElementById('questionCounter');
             if (questionCounter) {
-                questionCounter.textContent = `Question ${currentQuestion + 1}/${totalQuestions}`;
+                questionCounter.textContent = `Kérdés ${currentQuestion + 1}/${totalQuestions}`;
             }
         }
     </script>
