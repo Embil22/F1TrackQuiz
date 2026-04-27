@@ -397,5 +397,4 @@ foreach ($all_tracks as $track) {
         }
     </script>
 </body>
-
 </html>
