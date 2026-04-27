@@ -46,5 +46,4 @@ $stats = getUserStats($pdo, $_SESSION['user_id']);
         </div>
     </div>
 </body>
-
 </html>
