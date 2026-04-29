@@ -151,7 +151,7 @@ body {
 }
 
 .progress-bar {
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: linear-gradient(90deg, lime, darkgreen);
   height: 100%;
   width: 0%;
   transition: width 0.3s ease;
