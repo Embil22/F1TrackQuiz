@@ -299,3 +299,11 @@ body {
     width: 100%;
   }
 }
+
+.quiz-info {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  margin-bottom: 30px;
+  text-align: center;
+}
