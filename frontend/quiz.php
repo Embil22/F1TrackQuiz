@@ -378,8 +378,8 @@ foreach ($all_tracks as $track) {
                 const completeDiv = document.createElement('div');
                 completeDiv.className = 'quiz-complete';
                 completeDiv.innerHTML = `
-                    <h2>You've completed all questions!</h2>
-                    <p>Click the submit button to see your results.</p>
+                    <h2>Kitöltötted az összes kérdést!</h2>
+                    <p>Nyomja meg a beküldés gombot hogy lássa az eredményét.</p>
                     <div class="navigation-buttons">
                             <button type="submit" class="btn-submit" id="submitBtn";">Beküldés ✅</button>
                     </div>
