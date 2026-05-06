@@ -1,5 +1,5 @@
 <?php
-// backend/submit_quiz.php
+// backend/submit_quiz_multiple.php
 require_once '../backend/config.php';
 redirectIfNotLoggedIn();
 
@@ -14,16 +14,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $placeholders = str_repeat('?,', count($track_ids) - 1) . '?';
     $stmt = $pdo->prepare("SELECT id, name FROM tracks WHERE id IN ($placeholders)");
     $stmt->execute($track_ids);
-    $tracks = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    $correct_tracks = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
     
     // Evaluate answers
     $results = [];
     foreach ($track_ids as $track_id) {
-        $user_answer = trim($answers[$track_id] ?? '');
-        $correct_name = $tracks[$track_id] ?? '';
+        $user_selected_id = $answers[$track_id] ?? null;
+        $correct_name = $correct_tracks[$track_id] ?? '';
         
-        // Case-insensitive comparison
-        $is_correct = strcasecmp($user_answer, $correct_name) === 0;
+        // Get selected track name
+        $selected_name = '';
+        if ($user_selected_id) {
+            $stmt2 = $pdo->prepare("SELECT name FROM tracks WHERE id = ?");
+            $stmt2->execute([$user_selected_id]);
+            $selected = $stmt2->fetch(PDO::FETCH_ASSOC);
+            $selected_name = $selected['name'] ?? '';
+        }
+        
+        $is_correct = ($user_selected_id == $track_id);
         
         if ($is_correct) {
             $correct_count++;
@@ -32,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $results[] = [
             'track_id' => $track_id,
             'correct_name' => $correct_name,
-            'user_answer' => $user_answer,
+            'user_answer' => $selected_name ?: '(no answer)',
             'is_correct' => $is_correct
         ];
     }
@@ -51,10 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'results' => $results
     ];
     
- header('Location: ../frontend/results.php');  // Útvonal módosítva!
+    header('Location: ../frontend/results.php');
     exit();
 } else {
-    header('Location: ../frontend/quiz.php');  // Útvonal módosítva!
+    header('Location: ../frontend/quiz.php');
     exit();
 }
 ?>
