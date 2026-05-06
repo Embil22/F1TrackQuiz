@@ -2,6 +2,17 @@
 // frontend/index.php
 require_once '../backend/config.php';
 redirectIfNotLoggedIn();
+
+// Érem színek függvény
+function getMedal($rank) {
+    switch($rank) {
+        case 1: return '🥇';
+        case 2: return '🥈';
+        case 3: return '🥉';
+        default: return '';
+    }
+}
+
 $stats = getUserStats($pdo, $_SESSION['user_id']);
 
 // Részletes statisztikák lekérése a diagramhoz
@@ -41,6 +52,62 @@ foreach ($attempts_data as $attempt) {
 if ($stats['attempts'] == 0) {
     $best = 0;
     $worst = 0;
+}
+
+// RANGLISTA lekérése - TOP 5
+$stmt = $pdo->prepare("
+    SELECT 
+        u.id,
+        u.username,
+        COUNT(qa.id) as total_attempts,
+        COALESCE(AVG(qa.score_percent), 0) as avg_score,
+        COALESCE(MAX(qa.score_percent), 0) as best_score
+    FROM users u
+    LEFT JOIN quiz_attempts qa ON u.id = qa.user_id
+    GROUP BY u.id, u.username
+    HAVING total_attempts > 0
+    ORDER BY avg_score DESC, best_score DESC
+    LIMIT 5
+");
+$stmt->execute();
+$top_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Saját ranghely meghatározása - JAVÍTOTT VERZIÓ
+$my_rank = 0;
+$my_stats = null;
+
+// Először lekérjük a saját statisztikákat
+$stmt = $pdo->prepare("
+    SELECT 
+        u.id,
+        u.username,
+        COUNT(qa.id) as total_attempts,
+        COALESCE(AVG(qa.score_percent), 0) as avg_score,
+        COALESCE(MAX(qa.score_percent), 0) as best_score
+    FROM users u
+    LEFT JOIN quiz_attempts qa ON u.id = qa.user_id
+    WHERE u.id = ?
+    GROUP BY u.id, u.username
+");
+$stmt->execute([$_SESSION['user_id']]);
+$my_stats = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// Ha van a felhasználónak próbálkozása, kiszámoljuk a ranghelyét
+if ($my_stats && $my_stats['total_attempts'] > 0) {
+    // Megszámoljuk, hány felhasználónak jobb az átlaga
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) + 1 as rank
+        FROM (
+            SELECT u.id, COALESCE(AVG(qa.score_percent), 0) as avg_score
+            FROM users u
+            LEFT JOIN quiz_attempts qa ON u.id = qa.user_id
+            GROUP BY u.id
+            HAVING avg_score > ?
+        ) as better_players
+    ");
+    $stmt->execute([$my_stats['avg_score']]);
+    $rank_result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $my_rank = $rank_result['rank'] ?? 1;
 }
 ?>
 
@@ -137,7 +204,6 @@ if ($stats['attempts'] == 0) {
             padding: 20px 30px;
             border-radius: 16px;
             margin-bottom: 30px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
@@ -166,7 +232,7 @@ if ($stats['attempts'] == 0) {
         }
 
         .f1-logo-header {
-            width: 100px;
+            width: 60px;
             height: auto;
             transition: all 0.3s ease;
             filter: drop-shadow(0 0 5px rgba(225, 6, 0, 0.5));
@@ -240,7 +306,7 @@ if ($stats['attempts'] == 0) {
         /* Statisztikai kártyák */
         .stats-container {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 30px;
             margin-bottom: 30px;
         }
@@ -294,6 +360,75 @@ if ($stats['attempts'] == 0) {
             color: #aaa;
             margin-top: 5px;
             font-size: 14px;
+        }
+
+        /* Ranglista stílus */
+        .leaderboard-list {
+            margin-top: 10px;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .leaderboard-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .leaderboard-rank {
+            font-size: 24px;
+            font-weight: bold;
+            min-width: 50px;
+            color: #ffc107;
+        }
+
+        .leaderboard-name {
+            flex: 1;
+            color: #ddd;
+            font-weight: 500;
+        }
+
+        .leaderboard-stats {
+            text-align: right;
+        }
+
+        .leaderboard-avg {
+            font-size: 20px;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        .leaderboard-attempts {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .my-rank {
+            background: rgba(225, 6, 0, 0.2);
+            border: 1px solid #e10600;
+        }
+
+        .my-rank .leaderboard-rank {
+            color: #e10600;
+        }
+
+        .my-rank .leaderboard-name {
+            color: #e10600;
+            font-weight: bold;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 30px;
+            color: #888;
         }
 
         /* Diagram konténer */
@@ -450,7 +585,13 @@ if ($stats['attempts'] == 0) {
             margin-left: 5px;
         }
 
-        /* Reszponzív beállítások */
+        /* Reszponzív */
+        @media (max-width: 1000px) {
+            .stats-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
@@ -473,7 +614,7 @@ if ($stats['attempts'] == 0) {
             }
             
             .f1-logo-header {
-                width: 75px;
+                width: 45px;
             }
             
             .stats-card, .chart-container, .quiz-info {
@@ -492,6 +633,16 @@ if ($stats['attempts'] == 0) {
                 padding: 12px 25px;
                 font-size: 16px;
             }
+            
+            .leaderboard-item {
+                flex-wrap: wrap;
+            }
+            
+            .leaderboard-stats {
+                width: 100%;
+                text-align: left;
+                margin-top: 5px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -505,7 +656,7 @@ if ($stats['attempts'] == 0) {
             }
             
             .f1-logo-header {
-                width: 75px;
+                width: 35px;
             }
             
             .user-info span {
@@ -521,7 +672,6 @@ if ($stats['attempts'] == 0) {
 </head>
 
 <body>
-    <!-- Piros buborékok -->
     <ul class="bg-bubbles">
         <li></li><li></li><li></li><li></li><li></li>
         <li></li><li></li><li></li><li></li><li></li>
@@ -559,16 +709,68 @@ if ($stats['attempts'] == 0) {
 
             <!-- Legjobb/legrosszabb eredmények -->
             <div class="stats-card">
-                <h2>🎖️Eredmények</h2>
+                <h2>🏆 Eredmények</h2>
                 <div class="stats-grid">
                     <div class="stat-item">
                         <div class="stat-value best-score"><?php echo $best; ?>%</div>
-                        <div class="stat-label">🏅 Legjobb eredmény</div>
+                        <div class="stat-label">Legjobb eredmény</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value worst-score"><?php echo $worst; ?>%</div>
-                        <div class="stat-label">📉 Legrosszabb eredmény</div>
+                        <div class="stat-label">Legrosszabb eredmény</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Ranglista - TOP 5 -->
+            <div class="stats-card">
+                <h2>🏅 Ranglista - TOP 5</h2>
+                <div class="leaderboard-list">
+                    <?php if (count($top_players) > 0): ?>
+                        <?php foreach ($top_players as $index => $player): ?>
+                            <div class="leaderboard-item <?php echo ($player['id'] == $_SESSION['user_id']) ? 'my-rank' : ''; ?>">
+                                <div class="leaderboard-rank">
+                                    <?php echo getMedal($index + 1) ?: ($index + 1) . '.'; ?>
+                                </div>
+                                <div class="leaderboard-name">
+                                    <?php echo htmlspecialchars($player['username']); ?>
+                                    <?php if ($player['id'] == $_SESSION['user_id']): ?>
+                                        <span style="font-size: 10px; color: #e10600;"> (Te)</span>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="leaderboard-stats">
+                                    <div class="leaderboard-avg"><?php echo round($player['avg_score'], 1); ?>%</div>
+                                    <div class="leaderboard-attempts">
+                                        <?php echo $player['total_attempts']; ?> próbálkozás
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                        
+                        <!-- Saját helyezés (ha nincs benne a TOP 5-ben) -->
+                        <?php if ($my_stats && $my_stats['total_attempts'] > 0 && $my_rank > 5): ?>
+                            <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+                                <div class="leaderboard-item my-rank">
+                                    <div class="leaderboard-rank"><?php echo $my_rank; ?>.</div>
+                                    <div class="leaderboard-name">
+                                        <?php echo htmlspecialchars($my_stats['username']); ?>
+                                        <span style="font-size: 10px; color: #e10600;"> (Te)</span>
+                                    </div>
+                                    <div class="leaderboard-stats">
+                                        <div class="leaderboard-avg"><?php echo round($my_stats['avg_score'], 1); ?>%</div>
+                                        <div class="leaderboard-attempts">
+                                            <?php echo $my_stats['total_attempts']; ?> próbálkozás
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <div class="no-data">
+                            <p>Még nincs megjeleníthető ranglista</p>
+                            <p>Játssz egy kvízt, hogy felkerülj a ranglistára!</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -607,14 +809,14 @@ if ($stats['attempts'] == 0) {
                 </p>
             <?php else: ?>
                 <div class="no-data-message">
-                    <p>Még nincs kitöltött kvízed!</p>
+                    <p>📭 Még nincs kitöltött kvízed!</p>
                     <p>Kezdj el játszani a "Kvíz indítása" gombbal, és itt megjelennek a statisztikáid.</p>
                 </div>
             <?php endif; ?>
         </div>
 
         <div class="quiz-info">
-            <h2>Teszteld tudásod!</h2>
+            <h2>🧠 Teszteld tudásod!</h2>
             <p>Fel tudod ismerni mind a 24 Forma-1-es pályát a képek alapján?</p>
             <a href="quiz.php" class="btn-start">Kvíz indítása</a>
         </div>
