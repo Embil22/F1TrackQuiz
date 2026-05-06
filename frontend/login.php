@@ -29,11 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hu">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Login - F1 Quiz</title>
+    <title>Bejelentkezés - F1 Quiz</title>
     <link rel="stylesheet" href="style.css">
     <style>
         * {
@@ -181,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             box-shadow: 0 0 0 2px rgba(225, 6, 0, 0.2);
         }
         
-        /* Google stílusú checkbox */
+        /* Google stílusú checkbox - javított pipa pozíció */
         .checkbox-container {
             display: flex;
             align-items: center;
@@ -201,13 +201,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .checkmark {
             position: relative;
             display: inline-block;
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             background-color: rgba(255, 255, 255, 0.1);
             border: 1px solid #777;
-            border-radius: 3px;
+            border-radius: 4px;
             margin-right: 12px;
             transition: all 0.2s ease;
+            flex-shrink: 0;
         }
         
         .checkbox-container:hover input ~ .checkmark {
@@ -224,20 +225,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             content: "";
             position: absolute;
             display: none;
-        }
-        
-        .checkbox-container input:checked ~ .checkmark:after {
-            display: block;
-        }
-        
-        .checkbox-container .checkmark:after {
-            left: 6px;
-            top: 2px;
+            left: 50%;
+            top: 45%;
+            transform: translate(-50%, -55%) rotate(45deg);
             width: 5px;
             height: 10px;
             border: solid white;
             border-width: 0 2px 2px 0;
-            transform: rotate(45deg);
+        }
+        
+        .checkbox-container input:checked ~ .checkmark:after {
+            display: block;
         }
         
         .checkbox-label {
@@ -412,7 +410,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if (!username || !password) {
                 e.preventDefault();
-                alert('Please fill in all fields!');
+                alert('Kérlek töltsd ki az összes mezőt!');
             }
         });
         
