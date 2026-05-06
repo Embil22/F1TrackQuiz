@@ -48,10 +48,11 @@ body {
 .form-container {
   max-width: 400px;
   margin: 50px auto;
-  background: white;
+  background: #292424;
   padding: 30px;
   border-radius: 10px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  color: white;
 }
 
 .form-group {
