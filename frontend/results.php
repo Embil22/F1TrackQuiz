@@ -201,7 +201,7 @@ unset($_SESSION['quiz_results']);
         .score-percent {
             font-size: 64px;
             font-weight: bold;
-            background: linear-gradient(135deg, #28a745, #ffc107);
+            background: linear-gradient(135deg, lime, darkgreen);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
