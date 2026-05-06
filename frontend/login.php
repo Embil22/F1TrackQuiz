@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: index.php');
         exit();
     } else {
-        $error = 'Invalid username/email or password!';
+        $error = 'Helytelen email/felhasználónév vagy jelszó!';
     }
 }
 ?>
