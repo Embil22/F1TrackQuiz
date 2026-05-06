@@ -72,10 +72,10 @@ function optionClickHandler(e) {
   const feedbackDiv = document.getElementById(`feedback_${questionIndex}`);
   if (feedbackDiv) {
     if (isCorrect) {
-      feedbackDiv.innerHTML = "✅ Helyes! Szép volt!";
+      feedbackDiv.innerHTML = "Helyes! Szép volt!";
       feedbackDiv.className = "feedback-message feedback-correct";
     } else {
-      feedbackDiv.innerHTML = `❌ Helytelen! A jó válasz: ${correctTrackName}`;
+      feedbackDiv.innerHTML = `Helytelen! A jó válasz: ${correctTrackName}`;
       feedbackDiv.className = "feedback-message feedback-wrong";
     }
   }
