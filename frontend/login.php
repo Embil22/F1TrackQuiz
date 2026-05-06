@@ -6,11 +6,11 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
     $password = $_POST['password'];
-    
+
     $stmt = $pdo->prepare("SELECT id, username, password_hash FROM users WHERE username = ? OR email = ?");
     $stmt->execute([$username, $username]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    
+
     if ($user && password_verify($password, $user['password_hash'])) {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
@@ -24,12 +24,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - F1 Quiz</title>
     <link rel="stylesheet" href="style.css">
     <style>
+        body {
+            position: relative;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
         .bg-bubbles {
             position: fixed;
             top: 0;
@@ -38,6 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             height: 100%;
             z-index: 0;
             pointer-events: none;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
         }
 
         .bg-bubbles li {
@@ -46,11 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             display: block;
             width: 40px;
             height: 40px;
-            background-color: rgb(65, 61, 61);
+            background: rgba(102, 126, 234, 0.2);
             bottom: -160px;
-            animation: square 25s infinite;
-            transition-timing-function: linear;
+            animation: square 10s infinite;
+            animation-timing-function: linear;
             border-radius: 50%;
+            backdrop-filter: blur(5px);
         }
 
         .bg-bubbles li:nth-child(1) {
@@ -58,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 80px;
             height: 80px;
             animation-delay: 0s;
+            background: red;
         }
 
         .bg-bubbles li:nth-child(2) {
@@ -66,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             height: 40px;
             animation-delay: 2s;
             animation-duration: 17s;
+            background: red;
         }
 
         .bg-bubbles li:nth-child(3) {
@@ -73,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 120px;
             height: 120px;
             animation-delay: 4s;
+            background: red;
         }
 
         .bg-bubbles li:nth-child(4) {
@@ -81,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             height: 60px;
             animation-delay: 0s;
             animation-duration: 22s;
+            background: red;
         }
 
         .bg-bubbles li:nth-child(5) {
@@ -88,6 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 50px;
             height: 50px;
             animation-delay: 0s;
+            background: red;
         }
 
         .bg-bubbles li:nth-child(6) {
@@ -95,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 110px;
             height: 110px;
             animation-delay: 3s;
+            background: red;
         }
 
         .bg-bubbles li:nth-child(7) {
@@ -102,6 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 150px;
             height: 150px;
             animation-delay: 7s;
+            background: red;
         }
 
         .bg-bubbles li:nth-child(8) {
@@ -110,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             height: 45px;
             animation-delay: 15s;
             animation-duration: 40s;
+            background: red;
         }
 
         .bg-bubbles li:nth-child(9) {
@@ -118,6 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             height: 35px;
             animation-delay: 2s;
             animation-duration: 40s;
+            background: red;
         }
 
         .bg-bubbles li:nth-child(10) {
@@ -125,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             width: 140px;
             height: 140px;
             animation-delay: 11s;
+            background: red;
         }
 
         @keyframes square {
@@ -139,34 +160,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        /* A form legyen előtérben */
+        .container {
+            position: relative;
+            z-index: 1;
+        }
+
+        .form-container {
+            background: #292424;
+            backdrop-filter: blur(10px);
+            position: relative;
+            z-index: 2;
+            color: white;
+        }
     </style>
 </head>
+
 <body>
-    <div class="container">
-        <div class="form-container">
-            <h1>Login to F1 Quiz</h1>
-            
-            <?php if ($error): ?>
-                <div class="error-message"><?php echo $error; ?></div>
-            <?php endif; ?>
-            
-            <form method="POST" action="">
-                <div class="form-group">
-                    <label for="username">Username or Email:</label>
-                    <input type="text" id="username" name="username" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="password">Password:</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                
-                <button type="submit" class="btn btn-primary">Login</button>
-            </form>
-            
-            <p class="login-link">Don't have an account? <a href="register.php">Register here</a></p>
-        </div>
-    </div>
     <ul class="bg-bubbles">
         <li></li>
         <li></li>
@@ -179,5 +189,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <li></li>
         <li></li>
     </ul>
+
+    <div class="container">
+        <div class="form-container">
+            <h1>Login to F1 Quiz</h1>
+
+            <?php if ($error): ?>
+                <div class="error-message"><?php echo $error; ?></div>
+            <?php endif; ?>
+
+            <form method="POST" action="">
+                <div class="form-group">
+                    <label for="username">Username or Email:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+
+            <p class="login-link">Don't have an account? <a href="register.php">Register here</a></p>
+        </div>
+    </div>
 </body>
+
 </html>
