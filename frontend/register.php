@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)");
             
             if ($stmt->execute([$username, $email, $password_hash])) {
-                $success = 'Registration successful! Redirecting to login...';
+                $success = 'Regisztráció sikeres! Átirányítás a bejelentkezéshez...';
                 echo '<meta http-equiv="refresh" content="2;url=login.php">';
             } else {
                 $error = 'Sikertelen regisztráció, próbáld újra!';
