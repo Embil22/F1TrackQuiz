@@ -191,6 +191,43 @@ foreach ($all_tracks as $track) {
             }
         }
 
+        /* Időzítő stílus */
+        .timer-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+
+        .timer-box {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-size: 24px;
+            font-weight: bold;
+            font-family: monospace;
+            letter-spacing: 2px;
+        }
+
+        .timer-box.warning {
+            color: #ffc107;
+            animation: timerWarning 0.5s infinite;
+        }
+
+        .timer-box.danger {
+            color: #dc3545;
+            animation: timerDanger 0.3s infinite;
+        }
+
+        @keyframes timerWarning {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes timerDanger {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
         .progress-bar-container {
             background: rgba(255, 255, 255, 0.2);
             border-radius: 10px;
@@ -452,14 +489,13 @@ foreach ($all_tracks as $track) {
             .question-card {
                 padding: 20px;
             }
+            
+            .quiz-header-top {
+                flex-direction: column;
+            }
         }
 
         @media (max-width: 480px) {
-            .quiz-header-top {
-                flex-direction: column;
-                text-align: center;
-            }
-            
             .logo-container h1 {
                 font-size: 16px;
             }
@@ -476,6 +512,11 @@ foreach ($all_tracks as $track) {
             .track-image-side {
                 min-width: 250px;
             }
+            
+            .timer-box {
+                font-size: 18px;
+                padding: 5px 15px;
+            }
         }
     </style>
 </head>
@@ -483,18 +524,8 @@ foreach ($all_tracks as $track) {
 <body>
     <!-- Piros buborékok -->
     <ul class="bg-bubbles">
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
-        <li></li>
+        <li></li><li></li><li></li><li></li><li></li>
+        <li></li><li></li><li></li><li></li><li></li>
     </ul>
 
     <div class="container">
@@ -504,6 +535,9 @@ foreach ($all_tracks as $track) {
                     <img src="../backend/uploads/f1.png" alt="F1 Logo" class="f1-logo-header" draggable="false">
                     <h1>TRACK QUIZ</h1>
                 </div>
+            </div>
+            <div class="timer-container" id="timerContainer">
+                <div class="timer-box" id="timerBox">15s</div>
             </div>
             <div class="progress-bar-container">
                 <div class="progress-bar" id="progressBar"></div>
@@ -565,7 +599,319 @@ foreach ($all_tracks as $track) {
         <a href="index.php" class="btn-back">Vissza a főoldalra</a>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        let currentQuestion = 0;
+        let totalQuestions = 24;
+        let userAnswers = {};
+        let autoTransitionTimeout = null;
+        let timerInterval = null;
+        let timeLeft = 15;
+        let timeModeActive = false;
+        let isAnswered = false;
+
+        document.addEventListener("DOMContentLoaded", function () {
+            updateProgress();
+            attachOptionClickHandlers();
+            
+            // Timer always active
+            timeModeActive = true;
+            startTimer();
+        });
+        
+        function startTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            
+            isAnswered = false;
+            timeLeft = 15;
+            updateTimerDisplay();
+            
+            timerInterval = setInterval(function() {
+                if (!timeModeActive || isAnswered) return;
+                
+                timeLeft--;
+                updateTimerDisplay();
+                
+                if (timeLeft <= 0) {
+                    // Idő lejárt
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    handleTimeout();
+                }
+            }, 1000);
+        }
+        
+        function updateTimerDisplay() {
+            const timerBox = document.getElementById('timerBox');
+            if (!timerBox) return;
+            
+            timerBox.textContent = timeLeft + 's';
+            timerBox.classList.remove('warning', 'danger');
+            
+            if (timeLeft <= 5) {
+                timerBox.classList.add('danger');
+            } else if (timeLeft <= 10) {
+                timerBox.classList.add('warning');
+            }
+        }
+        
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+        
+        function handleTimeout() {
+            if (isAnswered) return;
+            isAnswered = true;
+            
+            const questionCard = document.querySelector(`.question-card[style*="display: block"]`);
+            if (!questionCard) return;
+            
+            const questionIndex = parseInt(questionCard.dataset.question);
+            const correctTrackId = questionCard.dataset.trackId;
+            const correctTrackName = questionCard.dataset.correctName;
+            const questionId = questionCard.querySelector('input[type="hidden"]').id.replace('answer_', '');
+            
+            // Letiltjuk az összes opciót
+            const optionsGrid = questionCard.querySelector('.options-grid');
+            const allOptions = optionsGrid.querySelectorAll('.option-card');
+            
+            allOptions.forEach(opt => {
+                opt.style.pointerEvents = 'none';
+                opt.classList.add('disabled');
+                
+                if (opt.dataset.trackId === correctTrackId) {
+                    opt.classList.add('correct-answer');
+                }
+            });
+            
+            // Mentés (helytelen válasz)
+            userAnswers[questionIndex] = {
+                track_id: questionId,
+                selected_id: null,
+                selected_name: 'Idő lejárt',
+                is_correct: false,
+                answered: true
+            };
+            
+            // Feedback megjelenítése
+            const feedbackDiv = document.getElementById(`feedback_${questionIndex}`);
+            if (feedbackDiv) {
+                feedbackDiv.innerHTML = `Idő lejárt! A helyes válasz: ${correctTrackName}`;
+                feedbackDiv.className = 'feedback-message feedback-wrong';
+            }
+            
+            updateScore();
+            
+            // Továbblépés jelzése
+            const nextIndicator = document.getElementById(`next_indicator_${questionIndex}`);
+            if (nextIndicator) {
+                nextIndicator.style.display = 'block';
+            }
+            
+            // Automatikus továbblépés
+            if (autoTransitionTimeout) {
+                clearTimeout(autoTransitionTimeout);
+            }
+            
+            autoTransitionTimeout = setTimeout(() => {
+                if (currentQuestion + 1 < totalQuestions) {
+                    showQuestion(currentQuestion + 1);
+                } else {
+                    showSubmitButton();
+                }
+            }, 1500);
+        }
+        
+        function attachOptionClickHandlers() {
+            document.querySelectorAll(".option-card").forEach((option) => {
+                option.removeEventListener("click", optionClickHandler);
+                option.addEventListener("click", optionClickHandler);
+            });
+        }
+        
+        function optionClickHandler(e) {
+            const option = e.currentTarget;
+            const questionCard = option.closest(".question-card");
+            const questionIndex = parseInt(questionCard.dataset.question);
+            
+            // Ellenőrizzük, hogy a kérdés már meg lett-e válaszolva
+            if (userAnswers[questionIndex] && userAnswers[questionIndex].answered) {
+                return;
+            }
+            
+            // Időzítő leállítása
+            if (timeModeActive) {
+                stopTimer();
+                isAnswered = true;
+            }
+            
+            const correctTrackId = questionCard.dataset.trackId;
+            const selectedTrackId = option.dataset.trackId;
+            const selectedTrackName = option.dataset.trackName;
+            const correctTrackName = questionCard.dataset.correctName;
+            const questionId = questionCard.querySelector('input[type="hidden"]').id.replace('answer_', "");
+            
+            // Letiltjuk az összes opciót ebben a kérdésben
+            const optionsGrid = option.closest(".options-grid");
+            const allOptions = optionsGrid.querySelectorAll(".option-card");
+            
+            // Kiemeljük a helyes és helytelen választ
+            allOptions.forEach((opt) => {
+                opt.style.pointerEvents = "none";
+                opt.classList.add("disabled");
+                
+                if (opt.dataset.trackId === correctTrackId) {
+                    opt.classList.add("correct-answer");
+                }
+                if (opt === option && selectedTrackId !== correctTrackId) {
+                    opt.classList.add("wrong-answer");
+                }
+            });
+            
+            // Kiértékelés
+            const isCorrect = selectedTrackId === correctTrackId;
+            
+            // Mentés
+            userAnswers[questionIndex] = {
+                track_id: questionId,
+                selected_id: selectedTrackId,
+                selected_name: selectedTrackName,
+                is_correct: isCorrect,
+                answered: true,
+            };
+            
+            // Hidden input frissítése
+            const hiddenInput = document.querySelector(`#answer_${questionId}`);
+            if (hiddenInput) {
+                hiddenInput.value = selectedTrackId;
+            }
+            
+            // Feedback megjelenítése
+            const feedbackDiv = document.getElementById(`feedback_${questionIndex}`);
+            if (feedbackDiv) {
+                if (isCorrect) {
+                    feedbackDiv.innerHTML = "Helyes! Szép volt!";
+                    feedbackDiv.className = "feedback-message feedback-correct";
+                } else {
+                    feedbackDiv.innerHTML = `Helytelen! A jó válasz: ${correctTrackName}`;
+                    feedbackDiv.className = "feedback-message feedback-wrong";
+                }
+            }
+            
+            // Score frissítése
+            updateScore();
+            
+            // Továbblépés jelzése
+            const nextIndicator = document.getElementById(`next_indicator_${questionIndex}`);
+            if (nextIndicator) {
+                nextIndicator.style.display = "block";
+            }
+            
+            // Automatikus továbblépés a következő kérdésre
+            if (autoTransitionTimeout) {
+                clearTimeout(autoTransitionTimeout);
+            }
+            
+            autoTransitionTimeout = setTimeout(() => {
+                if (currentQuestion + 1 < totalQuestions) {
+                    showQuestion(currentQuestion + 1);
+                } else {
+                    showSubmitButton();
+                }
+            }, 1500);
+        }
+        
+        function updateScore() {
+            let correctCount = 0;
+            let answeredCount = 0;
+            
+            for (const [key, answer] of Object.entries(userAnswers)) {
+                if (answer.answered) {
+                    answeredCount++;
+                    if (answer.is_correct) correctCount++;
+                }
+            }
+            
+            const scoreCounter = document.getElementById("scoreCounter");
+            if (scoreCounter) {
+                scoreCounter.textContent = `Pontszám: ${correctCount}/${answeredCount}`;
+            }
+        }
+        
+        function showQuestion(questionIndex) {
+            // Clear any pending timeout
+            if (autoTransitionTimeout) {
+                clearTimeout(autoTransitionTimeout);
+            }
+            
+            // Időzítő leállítása
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            
+            // Hide all questions
+            document.querySelectorAll(".question-card").forEach((card) => {
+                card.style.display = "none";
+            });
+            
+            // Show selected question
+            const targetQuestion = document.querySelector(`.question-card[data-question="${questionIndex}"]`);
+            if (targetQuestion) {
+                targetQuestion.style.display = "block";
+                currentQuestion = questionIndex;
+                updateProgress();
+                
+                // Új időzítő indítása, ha aktív
+                if (timeModeActive && !userAnswers[questionIndex]) {
+                    startTimer();
+                    isAnswered = false;
+                }
+            }
+        }
+        
+        function showSubmitButton() {
+            const submitBtn = document.getElementById('submitBtn');
+            
+            const container = document.querySelector('#questionsContainer');
+            const lastQuestion = document.querySelector('.question-card:last-child');
+            if (lastQuestion) {
+                const completeDiv = document.createElement('div');
+                completeDiv.className = 'quiz-complete';
+                completeDiv.innerHTML = `
+                    <h2>Kitöltötted az összes kérdést!</h2>
+                    <p>Nyomja meg a beküldés gombot hogy lássa az eredményét.</p>
+                    <div class="navigation-buttons">
+                        <button type="submit" class="btn-submit" id="submitBtn">Beküldés</button>
+                    </div>
+                `;
+                lastQuestion.appendChild(completeDiv);
+            }
+            
+            // Időzítő leállítása
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+        
+        function updateProgress() {
+            const progress = ((currentQuestion + 1) / totalQuestions) * 100;
+            const progressBar = document.getElementById("progressBar");
+            if (progressBar) {
+                progressBar.style.width = `${progress}%`;
+            }
+            
+            const questionCounter = document.getElementById("questionCounter");
+            if (questionCounter) {
+                questionCounter.textContent = `Kérdés ${currentQuestion + 1}/${totalQuestions}`;
+            }
+        }
+    </script>
 </body>
 
 </html>
