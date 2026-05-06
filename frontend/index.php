@@ -530,7 +530,7 @@ if ($stats['attempts'] == 0) {
     <div class="container">
         <div class="header">
             <div class="logo-container">
-                <img src="../backend/uploads/f1.png" alt="F1 Logo" class="f1-logo-header" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/F1.svg/200px-F1.svg.png'">
+                <img src="../backend/uploads/f1.png" alt="F1 Logo" class="f1-logo-header" draggable="false">
                 <h1>TRACK QUIZ</h1>
             </div>
             <div class="user-info">
