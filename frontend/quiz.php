@@ -1,46 +1,18 @@
 <?php
-// frontend/index.php
+// frontend/quiz.php
 require_once '../backend/config.php';
 redirectIfNotLoggedIn();
-$stats = getUserStats($pdo, $_SESSION['user_id']);
 
-// Részletes statisztikák lekérése a diagramhoz
-$stmt = $pdo->prepare("SELECT score_percent, completed_at FROM quiz_attempts WHERE user_id = ? ORDER BY completed_at ASC");
-$stmt->execute([$_SESSION['user_id']]);
-$attempts_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Get all tracks for the quiz (random sorrendben)
+$stmt = $pdo->query("SELECT id, name, country, image_url FROM tracks ORDER BY RAND()");
+$tracks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Kategóriákba sorolás a kördiagramhoz
-$excellent = 0; // 90-100%
-$good = 0;      // 70-89%
-$average = 0;   // 50-69%
-$poor = 0;      // 30-49%
-$bad = 0;       // 0-29%
-
-foreach ($attempts_data as $attempt) {
-    $score = $attempt['score_percent'];
-    if ($score >= 90) {
-        $excellent++;
-    } elseif ($score >= 70) {
-        $good++;
-    } elseif ($score >= 50) {
-        $average++;
-    } elseif ($score >= 30) {
-        $poor++;
-    } else {
-        $bad++;
-    }
-}
-
-// Legjobb és legrosszabb eredmény
-$best = 0;
-$worst = 100;
-foreach ($attempts_data as $attempt) {
-    if ($attempt['score_percent'] > $best) $best = $attempt['score_percent'];
-    if ($attempt['score_percent'] < $worst) $worst = $attempt['score_percent'];
-}
-if ($stats['attempts'] == 0) {
-    $best = 0;
-    $worst = 0;
+// Minden pályához gyűjtsünk 3 random másik pályát (helytelen válaszok)
+$all_track_names = [];
+$stmt = $pdo->query("SELECT id, name FROM tracks");
+$all_tracks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+foreach ($all_tracks as $track) {
+    $all_track_names[$track['id']] = $track['name'];
 }
 ?>
 
@@ -50,9 +22,8 @@ if ($stats['attempts'] == 0) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>F1 Quiz - Kezdőlap</title>
+    <title>F1 Quiz - Kvíz</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             margin: 0;
@@ -127,30 +98,35 @@ if ($stats['attempts'] == 0) {
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Header - üveghatás */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        /* Quiz header - üveghatás */
+        .quiz-header {
             background: rgba(41, 36, 36, 0.95);
             backdrop-filter: blur(10px);
-            padding: 20px 30px;
+            padding: 25px 30px;
             border-radius: 16px;
             margin-bottom: 30px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
-        .header:hover {
+        .quiz-header:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
         }
 
-        /* Logó konténer */
+        /* Logó konténer a fejlécben */
+        .quiz-header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
         .logo-container {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 12px;
             animation: slideIn 0.8s ease-out;
         }
 
@@ -198,7 +174,7 @@ if ($stats['attempts'] == 0) {
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            font-size: 28px;
+            font-size: 24px;
             letter-spacing: 2px;
             animation: textGlow 2s infinite;
         }
@@ -215,204 +191,207 @@ if ($stats['attempts'] == 0) {
             }
         }
 
-        .user-info {
+        .progress-bar-container {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            height: 10px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, lime, darkgreen);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .quiz-stats {
             display: flex;
-            gap: 15px;
-            align-items: center;
+            justify-content: space-between;
             color: #ddd;
+            font-size: 14px;
         }
 
-        .btn-logout {
-            background: linear-gradient(135deg, #dc3545, #ff6b6b);
-            color: white;
-            padding: 8px 20px;
-            border-radius: 8px;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            font-weight: 500;
-        }
-
-        .btn-logout:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
-        }
-
-        /* Statisztikai kártyák */
-        .stats-container {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-
-        .stats-card {
+        /* Kérdés kártya - üveghatás */
+        .question-card {
             background: rgba(41, 36, 36, 0.95);
             backdrop-filter: blur(10px);
-            padding: 25px;
+            padding: 30px;
             border-radius: 16px;
+            margin-bottom: 20px;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
 
-        .stats-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+        .question-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
         }
 
-        .stats-card h2 {
-            margin-bottom: 20px;
+        .question-number {
             color: #e10600;
-            border-bottom: 2px solid #e10600;
-            padding-bottom: 10px;
-            font-size: 20px;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-        }
-
-        .stat-item {
-            text-align: center;
-            padding: 15px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            transition: all 0.3s ease;
-        }
-
-        .stat-item:hover {
-            background: rgba(255, 255, 255, 0.15);
-            transform: scale(1.02);
-        }
-
-        .stat-value {
-            font-size: 36px;
+            font-size: 14px;
+            margin-bottom: 20px;
             font-weight: bold;
         }
 
-        .stat-label {
-            color: #aaa;
-            margin-top: 5px;
-            font-size: 14px;
-        }
-
-        /* Diagram konténer */
-        .chart-container {
-            background: rgba(41, 36, 36, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 25px;
-            border-radius: 16px;
-            margin-bottom: 30px;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .chart-container:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
-        }
-
-        .chart-container h2 {
-            margin-bottom: 20px;
-            color: #e10600;
-            border-bottom: 2px solid #e10600;
-            padding-bottom: 10px;
-            font-size: 20px;
-        }
-
-        .chart-wrapper {
+        .quiz-layout {
             display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
             gap: 30px;
+            flex-wrap: wrap;
         }
 
-        canvas {
-            max-width: 300px;
-            max-height: 300px;
+        .track-image-side {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            border-radius: 12px;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .track-image-side img {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 8px;
             transition: transform 0.3s ease;
+            background: white;
         }
 
-        canvas:hover {
+        .track-image-side img:hover {
             transform: scale(1.02);
         }
 
-        .chart-legend {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+        .options-side {
+            flex: 1;
+            min-width: 300px;
         }
 
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 14px;
+        .options-side h3 {
             color: #ddd;
-            padding: 8px 12px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            transition: all 0.3s ease;
+            margin-bottom: 20px;
+            font-size: 20px;
         }
 
-        .legend-item:hover {
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .option-card {
             background: rgba(255, 255, 255, 0.1);
-            transform: translateX(5px);
-        }
-
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            transition: transform 0.3s ease;
-        }
-
-        .legend-item:hover .legend-color {
-            transform: scale(1.1);
-        }
-
-        .legend-color.excellent { background: #28a745; box-shadow: 0 0 5px #28a745; }
-        .legend-color.good { background: #17a2b8; box-shadow: 0 0 5px #17a2b8; }
-        .legend-color.average { background: #ffc107; box-shadow: 0 0 5px #ffc107; }
-        .legend-color.poor { background: #fd7e14; box-shadow: 0 0 5px #fd7e14; }
-        .legend-color.bad { background: #dc3545; box-shadow: 0 0 5px #dc3545; }
-
-        .no-data-message {
+            border: 2px solid #555;
+            border-radius: 12px;
+            padding: 15px;
             text-align: center;
-            padding: 40px;
-            color: #aaa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #ddd;
+            font-weight: 500;
         }
 
-        /* Kvíz info kártya */
-        .quiz-info {
-            background: rgba(41, 36, 36, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 35px;
-            border-radius: 16px;
-            text-align: center;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .quiz-info:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
-        }
-
-        .quiz-info h2 {
-            color: #e10600;
-            margin-bottom: 15px;
-            font-size: 24px;
-        }
-
-        .quiz-info p {
-            color: #aaa;
-            margin-bottom: 25px;
-            font-size: 16px;
-        }
-
-        .btn-start {
-            display: inline-block;
+        .option-card:hover:not(.disabled) {
             background: linear-gradient(135deg, #e10600, #ff4d4d);
+            border-color: #e10600;
+            color: white;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(225, 6, 0, 0.4);
+        }
+
+        .option-card.disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .option-card.correct-answer {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+        }
+
+        .option-card.wrong-answer {
+            background: #dc3545;
+            border-color: #dc3545;
+            color: white;
+            box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+        }
+
+        .feedback-message {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .feedback-correct {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid #28a745;
+            color: #28a745;
+        }
+
+        .feedback-wrong {
+            background: rgba(220, 53, 69, 0.2);
+            border: 1px solid #dc3545;
+            color: #ff6b6b;
+        }
+
+        .next-indicator {
+            text-align: center;
+            margin-top: 20px;
+            color: #ffc107;
+            font-size: 14px;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Vissza gomb */
+        .btn-back {
+            display: inline-block;
+            background: linear-gradient(135deg, #2c50f0, #5a7eff);
+            color: white;
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .btn-back:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(44, 80, 240, 0.4);
+        }
+
+        /* Beküldő gomb */
+        .btn-submit {
+            background: linear-gradient(135deg, #28a745, #34ce57);
             color: white;
             padding: 14px 35px;
             font-size: 18px;
@@ -420,84 +399,65 @@ if ($stats['attempts'] == 0) {
             border: none;
             border-radius: 50px;
             cursor: pointer;
-            text-decoration: none;
             transition: all 0.3s ease;
-            animation: pulse 2s infinite;
+            width: 100%;
+            margin-top: 20px;
         }
 
-        .btn-start:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 25px rgba(225, 6, 0, 0.5);
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(40, 167, 69, 0.5);
         }
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-            100% { transform: scale(1); }
+        .quiz-complete {
+            text-align: center;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            margin-top: 20px;
         }
 
-        .best-score {
+        .quiz-complete h2 {
             color: #28a745;
+            margin-bottom: 15px;
         }
 
-        .worst-score {
-            color: #dc3545;
+        .quiz-complete p {
+            color: #ddd;
+            margin-bottom: 20px;
         }
 
-        .percentage-badge {
-            font-size: 12px;
-            color: #888;
-            margin-left: 5px;
-        }
-
-        /* Reszponzív beállítások */
+        /* Reszponzív */
         @media (max-width: 768px) {
             .container {
                 padding: 15px;
             }
             
-            .stats-container {
-                grid-template-columns: 1fr;
-                gap: 20px;
+            .quiz-layout {
+                flex-direction: column;
             }
             
-            .header {
-                flex-direction: column;
-                gap: 15px;
-                text-align: center;
-                padding: 20px;
+            .options-grid {
+                grid-template-columns: 1fr;
             }
             
             .logo-container h1 {
-                font-size: 20px;
+                font-size: 18px;
             }
             
             .f1-logo-header {
-                width: 75px;
+                width: 70px;
             }
             
-            .stats-card, .chart-container, .quiz-info {
+            .question-card {
                 padding: 20px;
-            }
-            
-            .stat-value {
-                font-size: 28px;
-            }
-            
-            .chart-wrapper {
-                flex-direction: column;
-            }
-            
-            .btn-start {
-                padding: 12px 25px;
-                font-size: 16px;
             }
         }
 
         @media (max-width: 480px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: 15px;
+            .quiz-header-top {
+                flex-direction: column;
+                text-align: center;
             }
             
             .logo-container h1 {
@@ -505,16 +465,16 @@ if ($stats['attempts'] == 0) {
             }
             
             .f1-logo-header {
-                width: 75px;
+                width: 55px;
             }
             
-            .user-info span {
+            .option-card {
+                padding: 12px;
                 font-size: 14px;
             }
             
-            .btn-logout {
-                padding: 6px 15px;
-                font-size: 14px;
+            .track-image-side {
+                min-width: 250px;
             }
         }
     </style>
@@ -528,152 +488,74 @@ if ($stats['attempts'] == 0) {
     </ul>
 
     <div class="container">
-        <div class="header">
-            <div class="logo-container">
-                <img src="../backend/uploads/f1.png" alt="F1 Logo" class="f1-logo-header" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/F1.svg/200px-F1.svg.png'">
-                <h1>TRACK QUIZ</h1>
-            </div>
-            <div class="user-info">
-                <span>Üdvözlet, <?php echo htmlspecialchars($_SESSION['username']); ?>!</span>
-                <a href="logout.php" class="btn-logout">Kijelentkezés</a>
-            </div>
-        </div>
-
-        <div class="stats-container">
-            <!-- Statisztikai kártyák -->
-            <div class="stats-card">
-                <h2>📊 Összesített statisztika</h2>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-value"><?php echo $stats['attempts']; ?></div>
-                        <div class="stat-label">Összes kitöltés</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value <?php echo $stats['avg_score'] >= 50 ? 'best-score' : ($stats['avg_score'] <= 30 ? 'worst-score' : ''); ?>">
-                            <?php echo $stats['avg_score']; ?>%
-                        </div>
-                        <div class="stat-label">Átlagos pontszám</div>
-                    </div>
+        <div class="quiz-header">
+            <div class="quiz-header-top">
+                <div class="logo-container">
+                    <img src="../backend/uploads/f1.png" alt="F1 Logo" class="f1-logo-header" draggable="false">
+                    <h1>TRACK QUIZ</h1>
                 </div>
             </div>
-
-            <!-- Legjobb/legrosszabb eredmények -->
-            <div class="stats-card">
-                <h2>🎖️Eredmények</h2>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-value best-score"><?php echo $best; ?>%</div>
-                        <div class="stat-label">🏅 Legjobb eredmény</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value worst-score"><?php echo $worst; ?>%</div>
-                        <div class="stat-label">📉 Legrosszabb eredmény</div>
-                    </div>
-                </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="quiz-stats">
+                <span id="questionCounter">Kérdés 1 / 24</span>
+                <span id="scoreCounter">Pontszám: 0 / 0</span>
             </div>
         </div>
 
-        <!-- Kördiagram -->
-        <div class="chart-container">
-            <h2>📈 Teljesítmény megoszlás</h2>
-            <?php if ($stats['attempts'] > 0): ?>
-                <div class="chart-wrapper">
-                    <canvas id="pieChart"></canvas>
-                    <div class="chart-legend">
-                        <div class="legend-item">
-                            <div class="legend-color excellent"></div>
-                            <span>Kiváló (90-100%) <span class="percentage-badge">(<?php echo $excellent; ?> db)</span></span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color good"></div>
-                            <span>Jó (70-89%) <span class="percentage-badge">(<?php echo $good; ?> db)</span></span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color average"></div>
-                            <span>Közepes (50-69%) <span class="percentage-badge">(<?php echo $average; ?> db)</span></span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color poor"></div>
-                            <span>Gyenge (30-49%) <span class="percentage-badge">(<?php echo $poor; ?> db)</span></span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color bad"></div>
-                            <span>Rossz (0-29%) <span class="percentage-badge">(<?php echo $bad; ?> db)</span></span>
-                        </div>
-                    </div>
-                </div>
-                <p style="text-align: center; margin-top: 20px; color: #888; font-size: 13px;">
-                    * Összesen <?php echo $stats['attempts']; ?> kitöltés elemzése
-                </p>
-            <?php else: ?>
-                <div class="no-data-message">
-                    <p>Még nincs kitöltött kvízed!</p>
-                    <p>Kezdj el játszani a "Kvíz indítása" gombbal, és itt megjelennek a statisztikáid.</p>
-                </div>
-            <?php endif; ?>
-        </div>
+        <form id="quizForm" method="POST" action="../backend/submit_quiz.php">
+            <div id="questionsContainer">
+                <?php foreach ($tracks as $index => $track):
+                    // Generáljunk 3 random másik pályát (helytelen válaszok)
+                    $other_tracks = array_diff(array_keys($all_track_names), [$track['id']]);
+                    shuffle($other_tracks);
+                    $wrong_options = array_slice($other_tracks, 0, 3);
 
-        <div class="quiz-info">
-            <h2>Teszteld tudásod!</h2>
-            <p>Fel tudod ismerni mind a 24 Forma-1-es pályát a képek alapján?</p>
-            <a href="quiz.php" class="btn-start">Kvíz indítása</a>
-        </div>
+                    $options = [];
+                    $options[] = ['id' => $track['id'], 'name' => $track['name']]; // helyes
+
+                    foreach ($wrong_options as $wrong_id) {
+                        $options[] = ['id' => $wrong_id, 'name' => $all_track_names[$wrong_id]];
+                    }
+
+                    // Megkeverjük a válaszlehetőségeket
+                    shuffle($options);
+                ?>
+                    <div class="question-card" data-question="<?php echo $index; ?>" data-track-id="<?php echo $track['id']; ?>" data-correct-name="<?php echo htmlspecialchars($track['name']); ?>" style="display: <?php echo $index === 0 ? 'block' : 'none'; ?>">
+                        <div class="question-number">Kérdés <?php echo $index + 1; ?> / 24</div>
+
+                        <div class="quiz-layout">
+                            <div class="track-image-side">
+                                <img src="<?php echo htmlspecialchars($track['image_url']); ?>" alt="Pálya <?php echo $index + 1; ?>">
+                            </div>
+
+                            <div class="options-side">
+                                <h3>Melyik pálya ez?</h3>
+                                <div class="options-grid" data-question-idx="<?php echo $index; ?>">
+                                    <?php foreach ($options as $opt): ?>
+                                        <div class="option-card" data-track-id="<?php echo $opt['id']; ?>" data-track-name="<?php echo htmlspecialchars($opt['name']); ?>">
+                                            <?php echo htmlspecialchars($opt['name']); ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="feedback-message" id="feedback_<?php echo $index; ?>"></div>
+                                <div class="next-indicator" id="next_indicator_<?php echo $index; ?>" style="display: none;">
+                                    Következő kérdés...
+                                </div>
+                            </div>
+                        </div>
+
+                        <input type="hidden" name="answers[<?php echo $track['id']; ?>]" id="answer_<?php echo $track['id']; ?>" value="">
+                        <input type="hidden" name="track_ids[]" value="<?php echo $track['id']; ?>">
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </form>
+        <a href="index.php" class="btn-back">Vissza a főoldalra</a>
     </div>
 
-    <?php if ($stats['attempts'] > 0): ?>
-        <script>
-            const ctx = document.getElementById('pieChart').getContext('2d');
-
-            const excellent = <?php echo $excellent; ?>;
-            const good = <?php echo $good; ?>;
-            const average = <?php echo $average; ?>;
-            const poor = <?php echo $poor; ?>;
-            const bad = <?php echo $bad; ?>;
-
-            new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: ['Kiváló (90-100%)', 'Jó (70-89%)', 'Közepes (50-69%)', 'Gyenge (30-49%)', 'Rossz (0-29%)'],
-                    datasets: [{
-                        data: [excellent, good, average, poor, bad],
-                        backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#fd7e14', '#dc3545'],
-                        borderColor: 'rgba(41, 36, 36, 0.95)',
-                        borderWidth: 2,
-                        hoverOffset: 15,
-                        hoverBorderWidth: 3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const label = context.label || '';
-                                    const value = context.raw || 0;
-                                    const total = excellent + good + average + poor + bad;
-                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                                    return `${label}: ${value} db (${percentage}%)`;
-                                }
-                            },
-                            backgroundColor: 'rgba(0,0,0,0.8)',
-                            titleColor: '#fff',
-                            bodyColor: '#ddd',
-                            borderColor: '#e10600',
-                            borderWidth: 1
-                        }
-                    },
-                    animation: {
-                        animateScale: true,
-                        animateRotate: true,
-                        duration: 1000
-                    }
-                }
-            });
-        </script>
-    <?php endif; ?>
+    <script src="script.js"></script>
 </body>
 
 </html>
