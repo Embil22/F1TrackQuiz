@@ -54,7 +54,7 @@ if ($stats['attempts'] == 0) {
     $worst = 0;
 }
 
-// RANGLISTA lekérése - TOP 5
+// RANGLISTA lekérése - TOP 5 (átlag szerint, ha egyezik, akkor több próbálkozás számít)
 $stmt = $pdo->prepare("
     SELECT 
         u.id,
@@ -66,17 +66,17 @@ $stmt = $pdo->prepare("
     LEFT JOIN quiz_attempts qa ON u.id = qa.user_id
     GROUP BY u.id, u.username
     HAVING total_attempts > 0
-    ORDER BY avg_score DESC, best_score DESC
+    ORDER BY avg_score DESC, total_attempts DESC, best_score DESC
     LIMIT 5
 ");
 $stmt->execute();
 $top_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Saját ranghely meghatározása - JAVÍTOTT VERZIÓ
+// Saját ranghely meghatározása
 $my_rank = 0;
 $my_stats = null;
 
-// Először lekérjük a saját statisztikákat
+// Lekérjük a saját statisztikákat
 $stmt = $pdo->prepare("
     SELECT 
         u.id,
@@ -92,20 +92,25 @@ $stmt = $pdo->prepare("
 $stmt->execute([$_SESSION['user_id']]);
 $my_stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// Ha van a felhasználónak próbálkozása, kiszámoljuk a ranghelyét
+// Ha van próbálkozás, kiszámoljuk a ranghelyet (átlag szerint, több próbálkozás előnyt jelent)
 if ($my_stats && $my_stats['total_attempts'] > 0) {
-    // Megszámoljuk, hány felhasználónak jobb az átlaga
     $stmt = $pdo->prepare("
         SELECT COUNT(*) + 1 as rank
-        FROM (
-            SELECT u.id, COALESCE(AVG(qa.score_percent), 0) as avg_score
-            FROM users u
-            LEFT JOIN quiz_attempts qa ON u.id = qa.user_id
-            GROUP BY u.id
-            HAVING avg_score > ?
-        ) as better_players
+        FROM users u
+        LEFT JOIN quiz_attempts qa ON u.id = qa.user_id
+        GROUP BY u.id
+        HAVING 
+            COALESCE(AVG(qa.score_percent), 0) > ? 
+            OR (
+                COALESCE(AVG(qa.score_percent), 0) = ? 
+                AND COUNT(qa.id) > ?
+            )
     ");
-    $stmt->execute([$my_stats['avg_score']]);
+    $stmt->execute([
+        $my_stats['avg_score'], 
+        $my_stats['avg_score'], 
+        $my_stats['total_attempts']
+    ]);
     $rank_result = $stmt->fetch(PDO::FETCH_ASSOC);
     $my_rank = $rank_result['rank'] ?? 1;
 }
