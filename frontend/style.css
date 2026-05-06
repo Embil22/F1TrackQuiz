@@ -9,6 +9,7 @@ body {
   background: linear-gradient(135deg, #000000 0%, #c9c3cf 100%);
   min-height: 100vh;
   color: #333;
+  user-select: none;
 }
 
 .container {
