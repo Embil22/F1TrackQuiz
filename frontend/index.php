@@ -814,14 +814,14 @@ if ($my_stats && $my_stats['total_attempts'] > 0) {
                 </p>
             <?php else: ?>
                 <div class="no-data-message">
-                    <p>📭 Még nincs kitöltött kvízed!</p>
+                    <p>Még nincs kitöltött kvízed!</p>
                     <p>Kezdj el játszani a "Kvíz indítása" gombbal, és itt megjelennek a statisztikáid.</p>
                 </div>
             <?php endif; ?>
         </div>
 
         <div class="quiz-info">
-            <h2>🧠 Teszteld tudásod!</h2>
+            <h2>Teszteld tudásod!</h2>
             <p>Fel tudod ismerni mind a 24 Forma-1-es pályát a képek alapján?</p>
             <a href="quiz.php" class="btn-start">Kvíz indítása</a>
         </div>
